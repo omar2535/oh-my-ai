@@ -1,0 +1,184 @@
+# omai harness registry. Facts verified 2026-09-26 — see specs/001-omai-harness-manager/research.md.
+# Placeholders: {provider}, {key}, {value}, {release_channel}. Channels are listed in preferred order.
+
+[claude]
+name = "Claude Code"
+bin = "claude"
+version = { cmd = ["claude", "--version"], regex = '^(\S+) \(Claude Code\)' }
+latest = { kind = "url_text", ref = "https://downloads.claude.ai/claude-code-releases/{release_channel}" }
+update = ["claude", "update"]
+default_provider = "anthropic"
+login = { mode = "command", argv = ["claude", "auth", "login"] }
+auth_status = { argv = ["claude", "auth", "status", "--json"], parse = "json_path", expr = "loggedIn" }
+skills_dir = { kind = "symlink", path = "~/.claude/skills" }
+config_dirs = ["~/.claude", "~/.claude.json"]
+
+[[claude.channels]]
+id = "native"
+detect = ["~/.local/share/claude/versions/*"]
+install = ["sh", "-c", "curl -fsSL https://claude.ai/install.sh | bash"]
+uninstall = ["sh", "-c", "rm -f ~/.local/bin/claude && rm -rf ~/.local/share/claude"]
+
+[[claude.channels]]
+id = "npm"
+detect = ["*/node_modules/@anthropic-ai/claude-code/*"]
+locate = ["~/.nvm/versions/node/*/bin/claude"]
+runtime_bound_if = ["~/.nvm/*"]
+requires = [{ runtime = "node", min = "22" }]
+install = ["npm", "install", "-g", "@anthropic-ai/claude-code"]
+uninstall = ["npm", "uninstall", "-g", "@anthropic-ai/claude-code"]
+
+[[claude.channels]]
+id = "brew"
+detect = ["/opt/homebrew/*", "/home/linuxbrew/*", "/usr/local/Caskroom/*"]
+install = ["brew", "install", "--cask", "claude-code@latest"]
+uninstall = ["brew", "uninstall", "--cask", "claude-code@latest"]
+
+[codex]
+name = "Codex"
+bin = "codex"
+version = { cmd = ["codex", "--version"], regex = 'codex-cli (\S+)' }
+latest = { kind = "npm", ref = "@openai/codex" }
+update = ["codex", "update"]
+default_provider = "openai"
+login = { mode = "command", argv = ["codex", "login"], revokes_existing = true }
+auth_status = { argv = ["codex", "login", "status"], parse = "exit_code" }
+skills_dir = { kind = "canonical" }
+config_dirs = ["~/.codex"]
+system_prereqs = [{ bin = "bwrap", hint = "Codex sandboxing needs bubblewrap: `sudo apt install bubblewrap` (run it yourself; omai never uses sudo)", os = ["linux", "wsl"] }]
+
+[[codex.channels]]
+id = "standalone"
+detect = ["~/.codex/packages/standalone/*"]
+install = ["sh", "-c", "curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh"]
+uninstall = ["sh", "-c", "rm -f ~/.local/bin/codex && rm -rf ~/.codex/packages/standalone"]
+
+[[codex.channels]]
+id = "npm"
+detect = ["*/node_modules/@openai/codex/*"]
+locate = ["~/.nvm/versions/node/*/bin/codex"]
+runtime_bound_if = ["~/.nvm/*"]
+requires = [{ runtime = "node", min = "16" }]
+install = ["npm", "install", "-g", "@openai/codex"]
+uninstall = ["npm", "uninstall", "-g", "@openai/codex"]
+
+[[codex.channels]]
+id = "brew"
+detect = ["/opt/homebrew/*", "/home/linuxbrew/*", "/usr/local/Caskroom/*"]
+install = ["brew", "install", "--cask", "codex"]
+uninstall = ["brew", "uninstall", "--cask", "codex"]
+
+[hermes]
+name = "Hermes Agent"
+bin = "hermes"
+version = { cmd = ["hermes", "--version"], regex = 'Hermes Agent v(\S+)' }
+latest = { kind = "github_release", ref = "NousResearch/hermes-agent", field = "name", regex = 'v(\d+\.\d+\.\d+)' }
+update = ["hermes", "update"]
+default_provider = "openai-codex"
+login = { mode = "command", argv = ["hermes", "auth", "add", "{provider}"] }
+auth_status = { argv = ["hermes", "auth", "status", "{provider}"], parse = "regex", expr = ': logged in\b' }
+config_get = ["hermes", "config", "get", "{key}"]
+config_set = ["hermes", "config", "set", "{key}", "{value}"]
+config_patches = [{ key = "auth.adopt_external_logins", value = "false" }]
+skills_dir = { kind = "external_dirs", path = "~/.agents/skills", key = "skills.external_dirs" }
+config_dirs = ["~/.hermes"]
+
+[[hermes.channels]]
+id = "git"
+markers = ["~/.hermes/hermes-agent/.git"]
+install = ["sh", "-c", "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive"]
+uninstall = ["sh", "-c", "rm -f ~/.local/bin/hermes ~/.local/bin/hermes-agent ~/.local/bin/hermes-acp && rm -rf ~/.hermes/hermes-agent"]
+
+[pi]
+name = "pi"
+bin = "pi"
+version = { cmd = ["pi", "--version"], regex = '^v?(\d[\w.\-]*)' }
+latest = { kind = "url_json", ref = "https://pi.dev/api/latest-version", field = "version" }
+update = ["pi", "update"]
+default_provider = "openai-codex"
+login = { mode = "manual", hint = "Run `pi`, then type /login and choose {provider}" }
+auth_status = { argv = ["pi", "auth", "check", "--provider", "{provider}", "--no-refresh", "--json"], parse = "exit_code" }
+skills_dir = { kind = "canonical" }
+config_dirs = ["~/.pi"]
+
+[[pi.channels]]
+id = "managed"
+detect = ["~/.pi/agent/install/*"]
+install = ["sh", "-c", "curl -fsSL https://pi.dev/install.sh | sh"]
+uninstall = ["sh", "-c", "rm -rf ~/.pi/agent/install ~/.pi/agent/bin/pi && rm -f ~/.local/bin/pi"]
+
+[[pi.channels]]
+id = "npm"
+detect = ["*/node_modules/@earendil-works/pi-coding-agent/*", "*/node_modules/@mariozechner/pi-coding-agent/*"]
+locate = ["~/.nvm/versions/node/*/bin/pi"]
+runtime_bound_if = ["~/.nvm/*"]
+requires = [{ runtime = "node", min = "22.19" }]
+install = ["npm", "install", "-g", "--ignore-scripts", "@earendil-works/pi-coding-agent"]
+uninstall = ["npm", "uninstall", "-g", "@earendil-works/pi-coding-agent"]
+
+[[pi.channels]]
+id = "brew"
+detect = ["/opt/homebrew/*", "/home/linuxbrew/*", "/usr/local/Cellar/*"]
+install = ["brew", "install", "pi-coding-agent"]
+uninstall = ["brew", "uninstall", "pi-coding-agent"]
+
+[omp]
+name = "oh-my-pi"
+bin = "omp"
+version = { cmd = ["omp", "--version"], regex = 'omp/(\S+)' }
+latest = { kind = "npm", ref = "@oh-my-pi/pi-coding-agent" }
+update = ["omp", "update"]
+default_provider = "openai-codex"
+login = { mode = "command", argv = ["omp", "login", "{provider}"] }
+# omp has no auth-status command; `omp models <provider>` lists models only for authenticated providers.
+auth_status = { argv = ["omp", "models", "{provider}", "--json"], parse = "regex", expr = '"provider":"{provider}"', timeout = 45 }
+skills_dir = { kind = "canonical" }
+config_dirs = ["~/.omp"]
+
+[[omp.channels]]
+id = "binary"
+detect = ["~/.local/bin/omp"]
+install = ["sh", "-c", "curl -fsSL https://omp.sh/install | sh -s -- --binary"]
+uninstall = ["rm", "-f", "~/.local/bin/omp"]
+
+[[omp.channels]]
+id = "bun"
+detect = ["~/.bun/*"]
+requires = [{ runtime = "bun", min = "1.3.14" }]
+install = ["bun", "install", "-g", "@oh-my-pi/pi-coding-agent"]
+uninstall = ["bun", "remove", "-g", "@oh-my-pi/pi-coding-agent"]
+
+[[omp.channels]]
+id = "brew"
+detect = ["/opt/homebrew/*", "/home/linuxbrew/*", "/usr/local/Cellar/*"]
+install = ["brew", "install", "can1357/tap/omp"]
+uninstall = ["brew", "uninstall", "omp"]
+
+[speckit]
+name = "spec-kit"
+kind = "tool"
+bin = "specify"
+version = { cmd = ["specify", "--version"], regex = 'specify (\S+)' }
+latest = { kind = "pypi", ref = "specify-cli" }
+update = ["uv", "tool", "install", "--force", "specify-cli"]
+
+[[speckit.channels]]
+id = "uv"
+detect = ["~/.local/share/uv/tools/specify-cli/*"]
+requires = [{ runtime = "uv", min = "0.4" }]
+install = ["uv", "tool", "install", "specify-cli"]
+uninstall = ["uv", "tool", "uninstall", "specify-cli"]
+
+[omai]
+name = "omai"
+kind = "self"
+bin = "omai"
+version = { cmd = ["omai", "--version"], regex = 'omai (\S+)' }
+latest = { kind = "github_tag", ref = "omar2535/oh-my-ai" }
+update = ["uv", "tool", "upgrade", "omai"]
+
+[[omai.channels]]
+id = "uv"
+detect = ["~/.local/share/uv/tools/omai/*"]
+install = ["uv", "tool", "install", "git+https://github.com/omar2535/oh-my-ai"]
+uninstall = ["uv", "tool", "uninstall", "omai"]
